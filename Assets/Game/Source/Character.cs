@@ -12,10 +12,23 @@ public class Character : MonoBehaviour
 	[SerializeField] private ObstacleChecker _groundChecker;
 	[SerializeField] private ObstacleChecker _cailChecker;
 
+	[SerializeField] private ObstacleChecker _rightWallChecker;
+	[SerializeField] private ObstacleChecker _leftWallChecker;
+
 	[SerializeField] private float _yVelocityForJump;
+
+	[SerializeField] private float _yVelocityForWallJump;
+	[SerializeField] private float _xVelocityForWallJump;
+
+	[SerializeField] private float _wallJumpHorizontalInputLockTime;
+
 	[SerializeField] private float _gravity;
+	[SerializeField] private float _wallFrictionFactor;
 
 	[SerializeField] private float _speed;
+
+	private float _horizontalInputLockTime;
+	private bool _isHorizontalInputLocked;
 
 	private Vector2 _velocity;
 
@@ -29,6 +42,8 @@ public class Character : MonoBehaviour
 	private void Update()
 	{
 		_jumpPressed = Input.GetKeyDown(JumpKey);
+
+		ProcessInputLock();
 
 		HandleHorizontalInput();
 
@@ -53,14 +68,53 @@ public class Character : MonoBehaviour
 
 	private void HandleHorizontalInput()
 	{
+		if (_isHorizontalInputLocked)
+			return;
+
 		float xInput = Input.GetAxis(HorizontalAxisName);
 		_velocity.x = _speed * xInput;
 	}
 
 	private void HandleJump()
 	{
-		if (_jumpPressed && _groundChecker.IsTouches())
+		if (!_jumpPressed)
+			return;
+
+		if (_groundChecker.IsTouches())
 			_velocity.y = _yVelocityForJump;
+		else if (IsTouchingWall())
+			HandleWallJump();
+	}
+
+	private void HandleWallJump()
+	{
+		_velocity.y = _yVelocityForWallJump;
+		_velocity.x = _rightWallChecker.IsTouches() ?
+			-_xVelocityForWallJump : _xVelocityForWallJump;
+		LockHorizontalInput(_wallJumpHorizontalInputLockTime);
+	}
+
+	private bool IsTouchingWall()
+	{
+		return _leftWallChecker.IsTouches() || _rightWallChecker.IsTouches();
+	}
+
+	private void LockHorizontalInput(float lockTime)
+	{
+		_isHorizontalInputLocked = true;
+		_horizontalInputLockTime = Mathf.Max(lockTime, _horizontalInputLockTime);
+	}
+
+	private void ProcessInputLock()
+	{
+		if (_isHorizontalInputLocked)
+		{
+			_horizontalInputLockTime -= Time.deltaTime;
+			if (_horizontalInputLockTime < 0)
+			{
+				_isHorizontalInputLocked = false;
+			}
+		}
 	}
 
 	private void HandleGravity()
@@ -68,7 +122,17 @@ public class Character : MonoBehaviour
 		if (_groundChecker.IsTouches() && _velocity.y <= 0)
 			_velocity.y = 0;
 		else
-			_velocity.y -= _gravity * Time.deltaTime;
+			_velocity.y -= CalcGravityForce() * Time.deltaTime;
+	}
+
+	private float CalcGravityForce()
+	{
+		float gravityForce = _gravity;
+		if (_velocity.y < 0 && IsTouchingWall())
+		{
+			gravityForce *= 1f - _wallFrictionFactor;
+		}
+		return gravityForce;
 	}
 
 	private Quaternion GetRotationFrom(Vector2 velocity)
