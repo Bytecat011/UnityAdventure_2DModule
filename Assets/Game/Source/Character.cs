@@ -1,12 +1,12 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
-public class Character : MonoBehaviour
+public class Character : MonoBehaviour, IKillable
 {
 	private const string HorizontalAxisName = "Horizontal";
 	private const KeyCode JumpKey = KeyCode.Space;
+
+	public event Action Died;
 
 	[SerializeField] private Rigidbody2D _rigidbody;
 	[SerializeField] private ObstacleChecker _groundChecker;
@@ -27,6 +27,8 @@ public class Character : MonoBehaviour
 
 	[SerializeField] private float _speed;
 
+	private bool _isAlive = true;
+
 	private float _horizontalInputLockTime;
 	private bool _isHorizontalInputLocked;
 
@@ -41,6 +43,11 @@ public class Character : MonoBehaviour
 
 	private void Update()
 	{
+		if (!_isAlive)
+		{
+			return;
+		}
+
 		_jumpPressed = Input.GetKeyDown(JumpKey);
 
 		ProcessInputLock();
@@ -144,5 +151,16 @@ public class Character : MonoBehaviour
 			return TurnLeft;
 
 		return transform.rotation;
+	}
+
+	public void Kill()
+	{
+		if (!_isAlive) {
+			return;
+		}
+
+		_isAlive = false; 
+		Destroy(gameObject);
+		Died?.Invoke();
 	}
 }
